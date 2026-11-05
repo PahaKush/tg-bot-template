@@ -1,0 +1,44 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [".git", "__pycache__", ".venv", "venv", "db_data"]
+
+[tool.ruff.lint]
+# E/F — pycodestyle и pyflakes, I — isort, B — bugbear, UP — pyupgrade,
+# SIM — simplify, RET — return, PT — pytest-style.
+select = ["E", "F", "I", "B", "UP", "SIM", "RET", "PT"]
+ignore = [
+    "B008",   # вызовы в аргументах: typer.Option и фильтры aiogram
+    "E501",   # длину строк держит форматтер
+    "RET501", # явный `return None` в конце функции не нужен
+]
+
+[tool.ruff.lint.isort]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "repos-services",  # core, repositories, services
+    "models-modules",  # models, modules
+    "first-party",     # остальное: db, handlers, main
+    "local-folder",
+]
+
+[tool.ruff.lint.isort.sections]
+"repos-services" = ["core", "repositories", "services"]
+"models-modules" = ["models", "modules"]
+
+[tool.ruff.lint.per-file-ignores]
+# Импорты после исполняемого кода — только в точках входа.
+"main.py" = ["E402"]
+"cli.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]
+testpaths = ["tests"]
