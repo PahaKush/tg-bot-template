@@ -12,6 +12,8 @@
 Правило простое: если в запросе есть чужой id, рядом обязан стоять user_id.
 """
 
+from typing import Any
+
 from models.enums import NoteColor
 
 from db.database import Database
@@ -27,14 +29,14 @@ class NotesRepository:
             (user_id, title, body),
         )
 
-    async def list_for_user(self, user_id: int) -> list[dict]:
+    async def list_for_user(self, user_id: int) -> list[dict[str, Any]]:
         rows = await self.db.fetch_all(
             "SELECT id, title, color, created_at FROM notes WHERE user_id = ? ORDER BY id DESC",
             (user_id,),
         )
         return [dict(r) for r in rows]
 
-    async def get(self, note_id: int, user_id: int) -> dict | None:
+    async def get(self, note_id: int, user_id: int) -> dict[str, Any] | None:
         """Чтение ОДНОЙ заметки — тоже со скоупом: иначе утечёт чужой текст."""
         row = await self.db.fetch_one(
             "SELECT * FROM notes WHERE id = ? AND user_id = ?",

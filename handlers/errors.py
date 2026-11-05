@@ -34,7 +34,7 @@ async def _reply(event: ErrorEvent, text: str, *, alert: bool = True) -> None:
 
 
 @router.error(ExceptionTypeFilter(TelegramBadRequest), F.update.callback_query.as_("callback"))
-async def handle_telegram_bad_request(event: ErrorEvent, callback: CallbackQuery, state: FSMContext):
+async def handle_telegram_bad_request(event: ErrorEvent, callback: CallbackQuery, state: FSMContext) -> None:
     """«message is not modified» — не ошибка, а повторный клик по той же кнопке."""
     if "message is not modified" in str(event.exception):
         logging.debug("Игнорирую: %s", event.exception)
@@ -45,7 +45,7 @@ async def handle_telegram_bad_request(event: ErrorEvent, callback: CallbackQuery
 
 
 @router.error(ExceptionTypeFilter(AppError))
-async def handle_app_errors(event: ErrorEvent):
+async def handle_app_errors(event: ErrorEvent) -> None:
     """Доменные ошибки. Стейт НЕ сбрасываем: флоу сам решает, продолжать или нет —
     иначе опечатка в одном поле выбрасывала бы пользователя из всей формы."""
     message = getattr(event.exception, "user_message", None) or str(event.exception)
@@ -53,7 +53,7 @@ async def handle_app_errors(event: ErrorEvent):
 
 
 @router.error(F.update.callback_query.as_("callback"))
-async def handle_unknown_error(event: ErrorEvent, callback: CallbackQuery, state: FSMContext):
+async def handle_unknown_error(event: ErrorEvent, callback: CallbackQuery, state: FSMContext) -> None:
     logging.error("Необработанная ошибка: %s", event.exception, exc_info=True)
     with suppress(Exception):
         await state.clear()
@@ -61,7 +61,7 @@ async def handle_unknown_error(event: ErrorEvent, callback: CallbackQuery, state
 
 
 @router.error(F.update.message.as_("message"))
-async def handle_unknown_message_error(event: ErrorEvent, message: Message, state: FSMContext):
+async def handle_unknown_message_error(event: ErrorEvent, message: Message, state: FSMContext) -> None:
     """Без этой ветки исключение в message-хендлере aiogram просто залогирует и дропнет —
     пользователь не увидит ничего и будет ждать ответа."""
     logging.error("Необработанная ошибка в message-хендлере: %s", event.exception, exc_info=True)

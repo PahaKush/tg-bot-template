@@ -8,6 +8,8 @@
 а не молчаливый отказ.
 """
 
+from typing import Any
+
 from tgkit import NotFoundError, UserInputError
 
 from repositories import NotesRepository
@@ -18,6 +20,26 @@ from db.database import Database
 
 MAX_NOTES_PER_USER = 50
 MAX_TITLE_LEN = 64
+# Карточка — заголовок, дата и текст в одном сообщении, а у Telegram лимит 4096 символов.
+MAX_BODY_LEN = 4000
+
+
+def clean_title(text: str | None) -> str:
+    title = (text or "").strip()
+    if not title:
+        raise UserInputError("Нужен текст заголовка.")
+    if len(title) > MAX_TITLE_LEN:
+        raise UserInputError(f"Заголовок длиннее {MAX_TITLE_LEN} символов — пришлите короче.")
+    return title
+
+
+def clean_body(text: str | None) -> str:
+    body = (text or "").strip()
+    if not body:
+        raise UserInputError("Нужен текст заметки.")
+    if len(body) > MAX_BODY_LEN:
+        raise UserInputError(f"Текст длиннее {MAX_BODY_LEN} символов — пришлите короче.")
+    return body
 
 
 class NotesManager:
@@ -26,11 +48,7 @@ class NotesManager:
         self.db = db
 
     async def add_note(self, user_id: int, title: str, body: str) -> int:
-        title = title.strip()
-        if not title:
-            raise UserInputError("Заголовок не может быть пустым.")
-        if len(title) > MAX_TITLE_LEN:
-            raise UserInputError(f"Заголовок длиннее {MAX_TITLE_LEN} символов.")
+        title, body = clean_title(title), clean_body(body)
 
         async with self.db.transaction():
             # Проверка и вставка в ОДНОЙ транзакции: иначе два быстрых сообщения подряд
@@ -39,7 +57,7 @@ class NotesManager:
                 raise UserInputError(f"Достигнут лимит в {MAX_NOTES_PER_USER} заметок.")
             return await self.notes_repo.create(user_id, title, body)
 
-    async def get_note(self, note_id: int, user_id: int) -> dict:
+    async def get_note(self, note_id: int, user_id: int) -> dict[str, Any]:
         note = await self.notes_repo.get(note_id, user_id)
         if note is None:
             # Одинаковый ответ и для «нет такой», и для «чужая»: иначе по разнице ответов

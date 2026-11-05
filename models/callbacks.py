@@ -37,6 +37,10 @@ class NoteDeleteCB(CallbackData, prefix="note_del"):
     note_id: int
 
 
+class BroadcastSendCB(CallbackData, prefix="broadcast_send"):
+    access: ClassVar[Access] = Access.ADMIN
+
+
 class SettingsCB(CallbackData, prefix="settings"):
     """Переключатели настроек бота."""
 

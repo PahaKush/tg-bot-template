@@ -17,4 +17,5 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff check --output-format=github .
       - run: ruff format --check .
+      - run: mypy .
       - run: pytest -q

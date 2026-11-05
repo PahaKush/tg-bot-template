@@ -14,6 +14,7 @@ SQLite-схема с миграциями.
 """
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -28,11 +29,14 @@ from dishka import make_async_container
 
 from core.di import AppProvider
 
+from models.callbacks import BroadcastSendCB
+
 from db.database import Database
 from main import build_dispatcher
 
 FAKE_TOKEN = "123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 USER_ID = 4242
+EPOCH = datetime.fromtimestamp(0, UTC)
 
 
 @dataclass
@@ -65,7 +69,7 @@ class RecordingSession(BaseSession):
     async def stream_content(self, *args: Any, **kwargs: Any):
         yield b""
 
-    async def make_request(self, bot: Bot, method: TelegramMethod, timeout: int | None = None) -> Any:
+    async def make_request(self, bot: Bot, method: TelegramMethod[Any], timeout: int | None = None) -> Any:
         data = method.model_dump(exclude_none=True)
         name = type(method).__name__
         markup = getattr(method, "reply_markup", None)
@@ -75,7 +79,7 @@ class RecordingSession(BaseSession):
             self._msg_id += 1
             return Message(
                 message_id=self._msg_id,
-                date=0,
+                date=EPOCH,
                 chat=Chat(id=USER_ID, type="private"),
                 text=str(data.get("text") or " "),
                 reply_markup=markup if isinstance(markup, InlineKeyboardMarkup) else None,
@@ -111,7 +115,7 @@ class Harness:
                 update_id=self._update_id,
                 message=Message(
                     message_id=self._update_id,
-                    date=0,
+                    date=EPOCH,
                     chat=Chat(id=USER_ID, type="private"),
                     from_user=self._user(),
                     text=text,
@@ -131,7 +135,7 @@ class Harness:
                     data=data,
                     message=Message(
                         message_id=self._update_id,
-                        date=0,
+                        date=EPOCH,
                         chat=Chat(id=USER_ID, type="private"),
                         text="prev",
                     ),
@@ -152,9 +156,8 @@ async def _app(tmp_path_factory):
     Dispatcher: `RuntimeError: Router is already attached`. Поэтому фикстура модульная, а
     изоляция тестов достигается очисткой таблиц (см. `harness`), а не пересборкой.
     """
-    container = make_async_container(AppProvider())
+    container = make_async_container(AppProvider(db_path=str(tmp_path_factory.mktemp("e2e") / "e2e.db")))
     db = await container.get(Database)
-    db._db_path = tmp_path_factory.mktemp("e2e") / "e2e.db"
     await db.connect()
     await db.run_migrations()
 
@@ -270,10 +273,42 @@ async def test_stale_button_does_not_break_note_flow(harness: Harness):
 
 
 @pytest.mark.asyncio(loop_scope="module")
-async def test_broadcast_sends_escaped_html(harness: Harness):
+async def test_too_long_title_keeps_the_step(harness: Harness):
+    await harness.send("/start")
+    await harness.click("note_new")
+
+    out = await harness.send("x" * 65)
+    assert "длиннее" in harness.texts(out)
+
+    out = await harness.send("Короткий")
+    assert "текст заметки" in harness.texts(out).lower()
+
+
+@pytest.mark.asyncio(loop_scope="module")
+async def test_broadcast_goes_out_only_after_confirmation(harness: Harness):
     """Бот шлёт с parse_mode=HTML: сырой «<» Telegram отверг бы у каждого получателя."""
     await harness.send("/broadcast")
-    out = await harness.send("Цена < 100")
+    preview = await harness.send("Цена < 100")
+    assert "Разослать" in harness.texts(preview)
 
-    sent = [s.text for s in out if s.method == "SendMessage" and "Цена" in s.text]
-    assert sent == ["Цена &lt; 100"]
+    out = await harness.click(BroadcastSendCB().pack())
+    assert [s.text for s in out if s.method == "SendMessage"] == ["Цена &lt; 100"]
+
+
+@pytest.mark.asyncio(loop_scope="module")
+async def test_command_is_not_broadcast(harness: Harness):
+    await harness.send("/broadcast")
+    out = await harness.send("/cancel")
+
+    assert "не команда" in harness.texts(out)
+    assert "Разослать" not in harness.texts(out)
+
+
+@pytest.mark.asyncio(loop_scope="module")
+async def test_cancelled_broadcast_sends_nothing(harness: Harness):
+    await harness.send("/broadcast")
+    await harness.send("Важное объявление")
+    await harness.click("start_menu")  # «Отмена ❌»
+
+    out = await harness.click(BroadcastSendCB().pack())
+    assert not any(s.method == "SendMessage" for s in out)

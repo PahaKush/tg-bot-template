@@ -6,6 +6,8 @@
 Копируйте этот файл как образец для своей фичи.
 """
 
+from typing import Any
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, User
@@ -17,7 +19,7 @@ from tgkit.utils.formatting import esc, format_db_timestamp
 from tgkit.utils.telegram import load_payload
 
 from repositories import NotesRepository
-from services.notes_manager import NotesManager
+from services.notes_manager import NotesManager, clean_body, clean_title
 
 from models.callbacks import NoteColorCB, NoteDeleteCB, NoteListCB, NoteViewCB
 from models.enums import NoteColor
@@ -38,7 +40,7 @@ async def render_notes_list(message: Message, user_id: int, notes_repo: NotesRep
     await message.edit_text(f"📝 <b>Ваши заметки:</b> {len(notes)}", reply_markup=notes_list_kb(notes, page))
 
 
-async def render_note(message: Message, note: dict) -> None:
+async def render_note(message: Message, note: dict[str, Any]) -> None:
     """Единственная точка отрисовки карточки — по той же причине, что и у списка."""
     color = NoteColor(note["color"])
     await message.edit_text(
@@ -55,7 +57,7 @@ async def handle_notes_list(
     callback_data: NoteListCB,
     callback_msg: Message,
     notes_repo: FromDishka[NotesRepository],
-):
+) -> None:
     await render_notes_list(callback_msg, callback.from_user.id, notes_repo, callback_data.page)
 
 
@@ -65,7 +67,7 @@ async def handle_note_view(
     callback_data: NoteViewCB,
     callback_msg: Message,
     notes_manager: FromDishka[NotesManager],
-):
+) -> None:
     """Карточка заметки.
 
     note_id пришёл из callback_data, то есть от клиента. Принадлежность проверяет
@@ -83,7 +85,7 @@ async def handle_note_color(
     callback_data: NoteColorCB,
     callback_msg: Message,
     notes_manager: FromDishka[NotesManager],
-):
+) -> None:
     async with error_screen(edit(callback_msg), "❌ Не удалось изменить метку.", NoteListCB()):
         await notes_manager.set_color(callback_data.note_id, callback.from_user.id, callback_data.color)
         note = await notes_manager.get_note(callback_data.note_id, callback.from_user.id)
@@ -97,7 +99,7 @@ async def handle_note_delete(
     callback_msg: Message,
     notes_manager: FromDishka[NotesManager],
     notes_repo: FromDishka[NotesRepository],
-):
+) -> None:
     async with error_screen(edit(callback_msg), "❌ Не удалось удалить.", NoteListCB()) as screen:
         await notes_manager.delete_note(callback_data.note_id, callback.from_user.id)
     if screen.failed:
@@ -108,24 +110,25 @@ async def handle_note_delete(
 
 
 # --- Многошаговый ввод ---------------------------------------------------------
+# Неверный ввод оставляет пользователя на шаге: исправить можно, не начиная заново.
 
 
 @router.callback_query(F.data == "note_new")
-async def handle_note_new(callback: CallbackQuery, callback_msg: Message, state: FSMContext):
+async def handle_note_new(callback: CallbackQuery, callback_msg: Message, state: FSMContext) -> None:
     await StateHelper.save(state, NoteCreationPayload())
     await callback_msg.edit_text("Введите заголовок заметки:", reply_markup=cancel_btn(NoteListCB()))
     await state.set_state(AddNote.waiting_for_title)
 
 
 @router.message(AddNote.waiting_for_title)
-async def handle_note_title(message: Message, state: FSMContext):
+async def handle_note_title(message: Message, state: FSMContext) -> None:
     payload = await load_payload(state, NoteCreationPayload, message, clear=False)
     if payload is None:
         return
 
-    payload.title = (message.text or "").strip()
-    if not payload.title:
-        await message.answer("⚠️ Нужен текст. Введите заголовок:")
+    async with error_screen(reply(message), "❌ Не удалось принять заголовок.", NoteListCB()) as screen:
+        payload.title = clean_title(message.text)
+    if screen.failed:
         return
 
     await StateHelper.save(state, payload)
@@ -139,19 +142,21 @@ async def handle_note_body(
     state: FSMContext,
     event_from_user: User,
     notes_manager: FromDishka[NotesManager],
-):
-    """Терминальный шаг: владеет очисткой стейта на ЛЮБОМ исходе.
-
-    Стейт чистится в finally, а не после успеха: иначе ошибка сохранения оставляла бы
-    пользователя внутри флоу без единой подсказки, что делать дальше.
-    """
+) -> None:
+    """После попытки сохранения стейт чистится на любом исходе: иначе ошибка сохранения
+    оставила бы пользователя в сценарии без подсказки, что делать дальше."""
     payload = await load_payload(state, NoteCreationPayload, message, clear=False)
     if payload is None or not payload.title:
         return
 
+    async with error_screen(reply(message), "❌ Не удалось принять текст.", NoteListCB()) as screen:
+        body = clean_body(message.text)
+    if screen.failed:
+        return
+
     try:
         async with error_screen(reply(message), "❌ Не удалось сохранить заметку.", NoteListCB()) as screen:
-            await notes_manager.add_note(event_from_user.id, payload.title, message.text or "")
+            await notes_manager.add_note(event_from_user.id, payload.title, body)
         if not screen.failed:
             await message.answer("✅ Заметка сохранена.", reply_markup=back_btn(NoteListCB()))
     finally:

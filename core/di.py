@@ -14,16 +14,20 @@ from repositories import NotesRepository, SettingsRepository, UserRepository
 from services.notes_manager import NotesManager
 from services.settings_manager import SettingsManager
 
-from db.database import Database
+from db.database import DB_PATH, Database
 
 
 class AppProvider(Provider):
     scope = Scope.APP
 
+    def __init__(self, db_path: str = DB_PATH) -> None:
+        super().__init__()
+        self.db_path = db_path
+
     @provide
     def get_database(self) -> Database:
         # Подключение и миграции выполняются явно в main.py при старте.
-        return Database()
+        return Database(self.db_path)
 
     # Репозитории: только SQL, без бизнес-правил.
     user_repo = provide(UserRepository)

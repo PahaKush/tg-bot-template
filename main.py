@@ -141,7 +141,7 @@ async def main() -> None:
 
     await setup_commands(bot, admins)
 
-    async def on_shutdown(*_args, **_kwargs) -> None:
+    async def on_shutdown(*_args: object, **_kwargs: object) -> None:
         logging.info("Остановка бота...")
         await dp.storage.close()
         await db.disconnect()

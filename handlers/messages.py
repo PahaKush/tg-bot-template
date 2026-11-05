@@ -12,5 +12,5 @@ router = Router()
 
 
 @router.message(StateFilter(None))
-async def handle_unknown_message(message: Message):
+async def handle_unknown_message(message: Message) -> None:
     await message.answer("Не понял. Откройте меню: /start")

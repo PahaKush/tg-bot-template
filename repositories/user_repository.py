@@ -1,3 +1,5 @@
+from typing import Any
+
 from db.database import Database
 
 
@@ -19,7 +21,7 @@ class UserRepository:
             (user_id, username, full_name),
         )
 
-    async def get_user(self, user_id: int) -> dict | None:
+    async def get_user(self, user_id: int) -> dict[str, Any] | None:
         row = await self.db.fetch_one("SELECT username, full_name FROM users WHERE user_id = ?", (user_id,))
         return dict(row) if row else None
 

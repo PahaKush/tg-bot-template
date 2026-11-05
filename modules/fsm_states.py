@@ -15,3 +15,4 @@ class AddNote(StatesGroup):
 
 class Broadcast(StatesGroup):
     waiting_for_text = State()
+    confirming = State()

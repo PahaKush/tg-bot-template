@@ -5,4 +5,4 @@ dishka==1.10.1
 pydantic==2.13.5
 python-dotenv==1.2.4
 typer==0.27.3
-tg-bot-kit @ https://github.com/PahaKush/tg-bot-kit/archive/refs/tags/v0.1.0.tar.gz
+tg-bot-kit @ https://github.com/PahaKush/tg-bot-kit/archive/refs/tags/v0.1.1.tar.gz

@@ -57,7 +57,9 @@ async def test_stranger_cannot_modify_foreign_note(
     with pytest.raises(NotFoundError):
         await notes_manager.set_color(note_id, other_user, NoteColor.DONE)
 
-    assert (await notes_repo.get(note_id, user))["color"] == "default"
+    note = await notes_repo.get(note_id, user)
+    assert note is not None
+    assert note["color"] == "default"
 
 
 @pytest.mark.asyncio
@@ -76,7 +78,9 @@ async def test_owner_can_manage_own_note(notes_manager: NotesManager, notes_repo
     note_id = await notes_manager.add_note(user, "Моя", "Тело")
 
     await notes_manager.set_color(note_id, user, NoteColor.IMPORTANT)
-    assert (await notes_repo.get(note_id, user))["color"] == "important"
+    note = await notes_repo.get(note_id, user)
+    assert note is not None
+    assert note["color"] == "important"
 
     await notes_manager.delete_note(note_id, user)
     assert await notes_repo.get(note_id, user) is None

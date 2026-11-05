@@ -25,7 +25,7 @@ python main.py
 Проверка:
 
 ```bash
-pytest -q && ruff check . && ruff format --check .
+pytest -q && ruff check . && ruff format --check . && mypy .
 ```
 
 ## Слои
@@ -87,6 +87,7 @@ test_flow_e2e.py         сквозные сценарии через насто
 test_callback_access.py  каждый коллбэк размечен; упаковка влезает в 64 байта
 test_handler_layers.py   правила слоя хендлеров (стражи из tgkit.testing)
 test_crypto_policy.py    шифрование работает и без ключа
+test_note_input.py       заголовок и текст заметки проверяются до сохранения
 ```
 
 `test_flow_e2e.py` кормит апдейтами диспетчер из `build_dispatcher()`, подменяя только

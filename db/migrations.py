@@ -7,7 +7,9 @@ python_func нужен там, где SQL не хватает: пересчёт 
 (executescript коммитит сам), поэтому SQL-миграции пишутся идемпотентными.
 """
 
-MIGRATIONS: list[dict] = [
+from tgkit import Migration
+
+MIGRATIONS: list[Migration] = [
     {
         "version": 1,
         "name": "baseline",

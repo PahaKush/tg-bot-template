@@ -1,5 +1,7 @@
 """Клавиатуры экранов шаблона. Примитивы (build_kb, «назад», пагинация) — в tgkit.kb."""
 
+from typing import Any, Literal
+
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup as Markup
 from aiogram.utils.keyboard import InlineKeyboardBuilder as Builder
@@ -13,12 +15,12 @@ def start_kb() -> Markup:
     return build_kb(("📝 Мои заметки", NoteListCB()), ("➕ Новая заметка", "note_new"))
 
 
-def _note_row(note: dict) -> Button:
+def _note_row(note: dict[str, Any]) -> Button:
     icon = NoteColor(note["color"]).icon
     return Button(text=f"{icon} {note['title']}", callback_data=NoteViewCB(note_id=note["id"]).pack())
 
 
-def notes_list_kb(notes: list[dict], page: int = 0, limit: int = 8) -> Markup:
+def notes_list_kb(notes: list[dict[str, Any]], page: int = 0, limit: int = 8) -> Markup:
     """Список заметок с пагинацией — типовой экран «много записей пользователя»."""
     kb, _ = paginated_kb(notes, page, limit, _note_row, lambda p: NoteListCB(page=p), empty_label="(Пока пусто)")
     kb.row(Button(text="➕ Новая заметка", callback_data="note_new"))
@@ -44,6 +46,6 @@ def note_view_kb(note_id: int, current: NoteColor) -> Markup:
 
 
 def settings_kb(debug_enabled: bool) -> Markup:
-    action = "disable" if debug_enabled else "enable"
+    action: Literal["enable", "disable"] = "disable" if debug_enabled else "enable"
     label = "🐞 DEBUG-логи: ВКЛ" if debug_enabled else "🐞 DEBUG-логи: выкл"
     return build_kb((label, SettingsCB(prop="debug", act=action)), ("⬅ В меню", "start_menu"))

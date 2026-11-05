@@ -21,9 +21,7 @@ EXPECTED_HANDLER_CHECKED: set[str] = set()
 
 # Предел каждого строкового поля callback_data. Без него худший случай упаковки не
 # посчитать, поэтому новое строковое поле без записи здесь роняет тест.
-STRING_FIELD_LIMITS = {
-    "flow_id": 8,  # models.fsm_payloads.new_flow_id
-}
+STRING_FIELD_LIMITS: dict[str, int] = {}
 
 
 def test_callbacks_discovered():
@@ -38,7 +36,7 @@ def test_every_callback_declares_access(klass):
 def test_handler_checked_set_is_exactly_as_expected():
     """Падает и когда HANDLER добавили новому коллбэку (проверьте хендлер), и когда его
     убрали (обновите список)."""
-    actual = {k.__name__ for k in ALL_CALLBACKS if k.access is Access.HANDLER}
+    actual = {k.__name__ for k in ALL_CALLBACKS if getattr(k, "access", None) is Access.HANDLER}
     assert actual == EXPECTED_HANDLER_CHECKED
 
 
