@@ -122,7 +122,7 @@ async def handle_note_new(callback: CallbackQuery, callback_msg: Message, state:
 
 @router.message(AddNote.waiting_for_title)
 async def handle_note_title(message: Message, state: FSMContext) -> None:
-    payload = await load_payload(state, NoteCreationPayload, message, clear=False)
+    payload = await load_payload(state, NoteCreationPayload, message)
     if payload is None:
         return
 
@@ -132,7 +132,7 @@ async def handle_note_title(message: Message, state: FSMContext) -> None:
         return
 
     await StateHelper.save(state, payload)
-    await message.answer("Теперь введите текст заметки:")
+    await message.answer("Теперь введите текст заметки:", reply_markup=cancel_btn(NoteListCB()))
     await state.set_state(AddNote.waiting_for_body)
 
 
@@ -145,8 +145,8 @@ async def handle_note_body(
 ) -> None:
     """После попытки сохранения стейт чистится на любом исходе: иначе ошибка сохранения
     оставила бы пользователя в сценарии без подсказки, что делать дальше."""
-    payload = await load_payload(state, NoteCreationPayload, message, clear=False)
-    if payload is None or not payload.title:
+    payload = await load_payload(state, NoteCreationPayload, message)
+    if payload is None:
         return
 
     async with error_screen(reply(message), "❌ Не удалось принять текст.", NoteListCB()) as screen:
@@ -156,7 +156,7 @@ async def handle_note_body(
 
     try:
         async with error_screen(reply(message), "❌ Не удалось сохранить заметку.", NoteListCB()) as screen:
-            await notes_manager.add_note(event_from_user.id, payload.title, body)
+            await notes_manager.add_note(event_from_user.id, payload.title or "", body)
         if not screen.failed:
             await message.answer("✅ Заметка сохранена.", reply_markup=back_btn(NoteListCB()))
     finally:

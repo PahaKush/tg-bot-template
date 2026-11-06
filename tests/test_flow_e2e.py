@@ -30,6 +30,7 @@ from dishka import make_async_container
 from core.di import AppProvider
 
 from models.callbacks import BroadcastSendCB
+from modules.fsm_states import AddNote
 
 from db.database import Database
 from main import build_dispatcher
@@ -182,7 +183,9 @@ async def harness(_app):
         await db.execute("DELETE FROM notes")
         await db.execute("DELETE FROM users")
     session.sent.clear()
-    await dp.storage.close()
+    storage = dp.storage
+    assert isinstance(storage, MemoryStorage)
+    storage.storage.clear()  # close() у MemoryStorage ничего не чистит
     dp.workflow_data["admins"] = [USER_ID]
 
     return Harness(dp, bot, session)
@@ -282,6 +285,40 @@ async def test_too_long_title_keeps_the_step(harness: Harness):
 
     out = await harness.send("Короткий")
     assert "текст заметки" in harness.texts(out).lower()
+
+
+@pytest.mark.asyncio(loop_scope="module")
+async def test_admin_commands_do_not_exist_for_others(harness: Harness):
+    harness.dp.workflow_data["admins"] = []
+
+    out = await harness.send("/settings")
+
+    assert "Не понял" in harness.texts(out)
+
+
+@pytest.mark.asyncio(loop_scope="module")
+async def test_command_does_not_become_a_note_title(harness: Harness):
+    harness.dp.workflow_data["admins"] = []
+    await harness.send("/start")
+    await harness.click("note_new")
+
+    out = await harness.send("/settings")
+    assert "команд" in harness.texts(out)
+
+    out = await harness.send("Покупки")
+    assert "текст заметки" in harness.texts(out).lower()
+
+
+@pytest.mark.asyncio(loop_scope="module")
+async def test_lost_payload_ends_the_flow(harness: Harness):
+    context = harness.dp.fsm.get_context(harness.bot, chat_id=USER_ID, user_id=USER_ID)
+    await context.set_state(AddNote.waiting_for_title)  # состояние есть, пейлоада нет
+
+    out = await harness.send("Покупки")
+    assert "Контекст потерян" in harness.texts(out)
+
+    out = await harness.send("Покупки")
+    assert "Не понял" in harness.texts(out)
 
 
 @pytest.mark.asyncio(loop_scope="module")

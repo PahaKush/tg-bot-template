@@ -28,6 +28,8 @@ def clean_title(text: str | None) -> str:
     title = (text or "").strip()
     if not title:
         raise UserInputError("Нужен текст заголовка.")
+    if title.startswith("/"):
+        raise UserInputError("Это похоже на команду. Пришлите заголовок или нажмите «⬅ Назад».")
     if len(title) > MAX_TITLE_LEN:
         raise UserInputError(f"Заголовок длиннее {MAX_TITLE_LEN} символов — пришлите короче.")
     return title
@@ -37,6 +39,8 @@ def clean_body(text: str | None) -> str:
     body = (text or "").strip()
     if not body:
         raise UserInputError("Нужен текст заметки.")
+    if body.startswith("/"):
+        raise UserInputError("Это похоже на команду. Пришлите текст заметки или нажмите «⬅ Назад».")
     if len(body) > MAX_BODY_LEN:
         raise UserInputError(f"Текст длиннее {MAX_BODY_LEN} символов — пришлите короче.")
     return body
